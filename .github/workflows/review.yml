@@ -26,17 +26,31 @@ jobs:
           PROMPT=$(cat prompts/CODEX.txt)
           DIFF=$(cat small_diff.txt)
 
+          FULL_INPUT="$PROMPT\n\nCODE:\n$DIFF"
+
+          JSON=$(jq -n --arg input "$FULL_INPUT" '{
+            "model": "gpt-4.1-mini",
+            input: $input
+          }')
+
+          echo "===== REQUEST JSON ====="
+          echo "$JSON"
+
           curl https://api.openai.com/v1/responses \
             -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -d "{
-              \"model\": \"gpt-5.3\",
-              \"input\": \"$PROMPT\n\nCODE:\n$DIFF\"
-            }" > review.json
+            -d "$JSON" > review.json
+
+          echo "===== RAW RESPONSE ====="
+          cat review.json    
+
 
       - name: Comment PR
         run: |
-          REVIEW=$(jq -r '.output_text' review.json)
+          REVIEW=$(jq -r '.output[0].content[0].text' review.json)
+
+          echo "====Final Review===="
+          echo "$REVIEW"
 
           gh pr comment ${{ github.event.pull_request.number }} \
             --body "$REVIEW"
