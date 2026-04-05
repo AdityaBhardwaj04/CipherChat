@@ -119,7 +119,7 @@ export async function generateKeyPair(uid) {
 /**
  * Check whether a key pair already exists for this user in IndexedDB.
  */
-export { deletePrivateKey };
+export { loadPrivateKey, deletePrivateKey };
 export async function hasKeyPair(uid) {
   const key = await loadPrivateKey(uid);
   return key !== null;
