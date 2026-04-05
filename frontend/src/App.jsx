@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db, provider } from './firebase';
+import { auth, db, provider, clearConfig } from './firebase';
 import { generateKeyPair, hasKeyPair, downloadPrivateKey, deletePrivateKey } from './crypto';
 import Chat from './Chat';
 
@@ -41,11 +41,12 @@ async function setupKeys(uid) {
 }
 
 export default function App() {
-  const [user, setUser]       = useState(undefined);
-  const [keyReady, setKeyReady] = useState(false);
+  const [user, setUser]             = useState(undefined);
+  const [keyReady, setKeyReady]     = useState(false);
   const [keyGenerated, setKeyGenerated] = useState(false);
-  const [error, setError]     = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [ownPublicKey, setOwnPublicKey] = useState(null);
+  const [error, setError]           = useState(null);
+  const [loading, setLoading]       = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
@@ -53,6 +54,9 @@ export default function App() {
         try {
           await ensureUserProfile(u);
           const { generated } = await setupKeys(u.uid);
+          // Fetch own public key — needed by Chat for double-encryption (message history)
+          const snap = await getDoc(doc(db, 'users', u.uid));
+          setOwnPublicKey(snap.data()?.publicKey ?? null);
           setKeyGenerated(generated);
           setKeyReady(true);
         } catch (e) {
@@ -61,6 +65,7 @@ export default function App() {
       } else {
         setKeyReady(false);
         setKeyGenerated(false);
+        setOwnPublicKey(null);
       }
       setUser(u ?? null);
     });
@@ -140,7 +145,7 @@ export default function App() {
           </button>
           <button onClick={handleSignOut}>Sign out</button>
 
-          {keyReady && <Chat user={user} />}
+          {keyReady && <Chat user={user} ownPublicKey={ownPublicKey} />}
         </>
       ) : (
         <>
@@ -148,6 +153,20 @@ export default function App() {
           <button onClick={handleSignIn} disabled={loading}>
             {loading ? 'Signing in…' : 'Sign in with Google'}
           </button>
+          <p style={{ marginTop: '2rem', fontSize: '0.8rem', color: '#999' }}>
+            Wrong Firebase project?{' '}
+            <button
+              onClick={() => {
+                if (window.confirm('Remove your Firebase config? You will need to paste it again.')) {
+                  clearConfig();
+                  window.location.reload();
+                }
+              }}
+              style={{ fontSize: '0.8rem', cursor: 'pointer' }}
+            >
+              Reset config
+            </button>
+          </p>
         </>
       )}
     </main>

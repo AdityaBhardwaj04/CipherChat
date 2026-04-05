@@ -2,29 +2,40 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
-const required = [
-  'VITE_FIREBASE_API_KEY',
-  'VITE_FIREBASE_AUTH_DOMAIN',
-  'VITE_FIREBASE_PROJECT_ID',
-  'VITE_FIREBASE_APP_ID',
-];
+// ── Runtime config ──────────────────────────────────────────────────────────────
+// Firebase config is stored in localStorage by the user on first visit (Setup screen).
+// This lets every user bring their own Firebase project — no shared backend database.
+// No env vars needed for Firebase; only VITE_SERVER_URL is baked in at build time.
 
-for (const key of required) {
-  if (!import.meta.env[key]) {
-    throw new Error(`Missing Firebase config: ${key}`);
-  }
+const STORAGE_KEY = 'cipherchat_firebase_config';
+
+export function getStoredConfig() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch { return null; }
 }
 
-const firebaseConfig = {
-  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId:             import.meta.env.VITE_FIREBASE_APP_ID,
-};
+export function saveConfig(config) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+}
 
-const app      = initializeApp(firebaseConfig);
-export const auth     = getAuth(app);
-export const db       = getFirestore(app);
-export const provider = new GoogleAuthProvider();
+export function clearConfig() {
+  localStorage.removeItem(STORAGE_KEY);
+}
+
+// ── Firebase initialization ─────────────────────────────────────────────────────
+// Initialized at module load time from localStorage. If no config exists yet,
+// all exports are null — main.jsx will render <Setup /> instead of <App />.
+
+const storedConfig = getStoredConfig();
+
+let auth = null;
+let db   = null;
+let provider = null;
+
+if (storedConfig) {
+  const app = initializeApp(storedConfig);
+  auth     = getAuth(app);
+  db       = getFirestore(app);
+  provider = new GoogleAuthProvider();
+}
+
+export { auth, db, provider };
