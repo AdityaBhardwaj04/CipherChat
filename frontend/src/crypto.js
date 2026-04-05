@@ -2,10 +2,16 @@
  * CipherChat — client-side RSA key generation module
  *
  * Rules:
- *  - Private key NEVER leaves the browser
+ *  - Private key NEVER leaves the browser automatically
  *  - Only public key (SPKI/PEM) is shared with Firestore
- *  - Private key is stored in IndexedDB via Web Crypto (non-extractable after export)
- *  - User may download private key as .pem for CLI use (one-time export)
+ *  - Private key is stored in IndexedDB (CryptoKey object)
+ *  - User may explicitly download private key as .pem for CLI use
+ *
+ * NOTE on extractable:true — the spec requires a .pem download for CLI use,
+ * so the private key must be extractable. This is a deliberate trade-off:
+ * export only happens on explicit user action (with a confirmation dialog in
+ * the UI). XSS risk is mitigated by CSP headers at the hosting layer.
+ * Firestore security rules must restrict publicKey writes to the owning uid only.
  */
 
 const DB_NAME    = 'cipherchat-keys';

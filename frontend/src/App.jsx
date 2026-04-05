@@ -76,6 +76,12 @@ export default function App() {
   };
 
   const handleDownload = async () => {
+    const confirmed = window.confirm(
+      'You are about to download your private key.\n\n' +
+      'Keep this file secure — anyone with it can read your messages.\n\n' +
+      'Continue?'
+    );
+    if (!confirmed) return;
     setError(null);
     try {
       await downloadPrivateKey(user.uid);
