@@ -4,3 +4,5 @@ node_modules/
 *.key
 dist/
 .DS_Store
+package-lock.json
+.claude/settings.local.json

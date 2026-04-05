@@ -1,22 +1,31 @@
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 
 const msg = process.argv[2] || "AI update";
 
 try {
-  // Get current branch name
-  const branch = execSync("git rev-parse --abbrev-ref HEAD")
+  const branch = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"])
     .toString()
     .trim();
 
-  console.log(`📌 Current branch: ${branch}`);
+  console.log(`Current branch: ${branch}`);
 
-  execSync("git add .", { stdio: "inherit" });
-  execSync(`git commit -m "${msg}"`, { stdio: "inherit" });
+  execFileSync("git", ["add", "."], { stdio: "inherit" });
 
-  // Push current branch
-  execSync(`git push -u origin ${branch}`, { stdio: "inherit" });
+  try {
+    execFileSync("git", ["commit", "-m", msg], { stdio: "inherit" });
+  } catch (e) {
+    if (e.stderr?.toString().includes("nothing to commit") ||
+        e.stdout?.toString().includes("nothing to commit")) {
+      console.log("No changes to commit.");
+      process.exit(0);
+    }
+    throw e;
+  }
 
-  console.log("✅ Code pushed successfully");
+  execFileSync("git", ["push", "-u", "origin", branch], { stdio: "inherit" });
+
+  console.log("Code pushed successfully.");
 } catch (err) {
-  console.error("❌ Error:", err.message);
+  console.error("Failed to push code:", err.message);
+  process.exit(1);
 }
