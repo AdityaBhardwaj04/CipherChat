@@ -14,8 +14,8 @@ Main branch: `main`
 4. Web authentication ✅
 5. RSA key generation module ✅
 6. Encryption utilities (AES + RSA) ✅
-7. Message flow ⬅ NEXT
-8. Improvements
+7. Message flow ✅
+8. Improvements ⬅ NEXT
 
 ---
 
@@ -80,8 +80,25 @@ Main branch: `main`
 
 ---
 
-## Step 7 — What to Build Next
-**Message flow** — wire encrypt.js into CLI send/receive and frontend send/receive
+### Step 7 — Message Flow
+**Files:** `cli/src/index.js` (updated), `frontend/src/Chat.jsx` (new), `frontend/src/App.jsx` (updated), `frontend/src/crypto.js` (exported `loadPrivateKey`)
+- CLI: prompts for `.pem` path at startup, fetches recipient public key from Firestore REST API (unauthenticated — public keys are public by design, documented in code), encrypts every outgoing message, decrypts every incoming message
+- `loadPrivateKey` validates RSA key size ≥ 2048 bits before accepting
+- `MAX_USERNAME_LEN = 32`, `MAX_MESSAGE_LEN = 1024` named consistently
+- Frontend `Chat.jsx`: looks up recipient by `displayName` in Firestore, connects to Socket.IO, encrypts sends via `encryptMessage`, decrypts receives via `decryptMessage`, auto-scrolls
+- `App.jsx` renders `<Chat user={user} />` after `keyReady`
+- PR #11 merged ✅
+
+---
+
+## Step 8 — What to Build Next
+**Improvements** — per spec:
+- Key rotation / revocation UI in web app
+- Replay protection (message sequence numbers or timestamps)  
+- Better error UX (frontend toast/error boundaries)
+- Rate limiting on backend socket events
+- Forward secrecy consideration
+- Any other polish items from the spec (`prompts/CLAUDE.txt`)
 
 ---
 
