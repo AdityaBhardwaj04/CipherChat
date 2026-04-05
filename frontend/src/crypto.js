@@ -51,6 +51,16 @@ async function loadPrivateKey(uid) {
   });
 }
 
+async function deletePrivateKey(uid) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(STORE_NAME, 'readwrite');
+    const req = tx.objectStore(STORE_NAME).delete(uid);
+    req.onsuccess = () => resolve();
+    req.onerror   = () => reject(req.error);
+  });
+}
+
 // ── Encoding helpers ───────────────────────────────────────────────────────────
 
 function bufferToPem(buffer, label) {
@@ -96,6 +106,7 @@ export async function generateKeyPair(uid) {
 /**
  * Check whether a key pair already exists for this user in IndexedDB.
  */
+export { deletePrivateKey };
 export async function hasKeyPair(uid) {
   const key = await loadPrivateKey(uid);
   return key !== null;

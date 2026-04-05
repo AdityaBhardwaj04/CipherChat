@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, provider } from './firebase';
-import { generateKeyPair, hasKeyPair, downloadPrivateKey } from './crypto';
+import { generateKeyPair, hasKeyPair, downloadPrivateKey, deletePrivateKey } from './crypto';
 
 // Create Firestore profile on first sign-in.
 async function ensureUserProfile(user) {
@@ -24,12 +24,18 @@ async function ensureUserProfile(user) {
 }
 
 // Generate keys if none exist, then persist public key to Firestore.
+// Rolls back IndexedDB if Firestore write fails — prevents local/remote key mismatch.
 async function setupKeys(uid) {
   const alreadyHasKeys = await hasKeyPair(uid);
   if (alreadyHasKeys) return { generated: false };
 
   const { publicKeyPem } = await generateKeyPair(uid);
-  await updateDoc(doc(db, 'users', uid), { publicKey: publicKeyPem });
+  try {
+    await updateDoc(doc(db, 'users', uid), { publicKey: publicKeyPem });
+  } catch (e) {
+    await deletePrivateKey(uid);
+    throw new Error(`Failed to save public key: ${e.message}`);
+  }
   return { generated: true, publicKeyPem };
 }
 
@@ -128,7 +134,7 @@ export default function App() {
             <p style={{ color: 'green' }}>RSA key pair already exists on this device.</p>
           )}
 
-          <button onClick={handleDownload} style={{ marginRight: '0.5rem' }}>
+          <button onClick={handleDownload} disabled={!keyReady} style={{ marginRight: '0.5rem' }}>
             Re-download private key
           </button>
           <button onClick={handleSignOut}>Sign out</button>
