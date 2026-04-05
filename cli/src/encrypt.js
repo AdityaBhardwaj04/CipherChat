@@ -25,13 +25,18 @@ import { readFileSync } from 'node:fs';
 // ── Key helpers ─────────────────────────────────────────────────────────────────
 
 /**
- * Load a PKCS#8 PEM private key from disk.
+ * Load a PKCS#8 PEM private key from disk and validate it meets minimum security requirements.
  * @param {string} pemPath  Path to the .pem file downloaded from the web app
  * @returns {KeyObject}
  */
 export function loadPrivateKey(pemPath) {
   const pem = readFileSync(pemPath, 'utf8');
-  return createPrivateKey(pem);
+  const key = createPrivateKey(pem);
+  const { modulusLength } = key.asymmetricKeyDetails ?? {};
+  if (!modulusLength || modulusLength < 2048) {
+    throw new Error(`RSA key too weak: ${modulusLength ?? 'unknown'} bits. Minimum is 2048.`);
+  }
+  return key;
 }
 
 // ── Public API ──────────────────────────────────────────────────────────────────

@@ -8,10 +8,18 @@ dotenv.config();
 
 const SERVER_URL       = process.env.SERVER_URL        || 'http://localhost:5000';
 const FIREBASE_PROJECT = process.env.FIREBASE_PROJECT_ID;
-const MAX_LEN = 32;
+const MAX_USERNAME_LEN = 32;
+const MAX_MESSAGE_LEN  = 1024;
 
 // ── Firestore REST lookup ───────────────────────────────────────────────────────
 // Queries users collection by displayName to fetch the recipient's RSA public key.
+//
+// NOTE on unauthenticated request — INTENTIONAL, DO NOT ADD AUTH TOKEN.
+// RSA public keys are public by cryptographic design. The entire point of
+// asymmetric encryption is that public keys can be shared openly. Requiring
+// auth to read a public key would break the CLI (no browser/Google sign-in
+// available in a terminal). Firestore rules must allow public reads of the
+// publicKey field and restrict writes to the owning uid only.
 async function fetchPublicKey(displayName) {
   if (!FIREBASE_PROJECT) throw new Error('FIREBASE_PROJECT_ID not set in .env');
   const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/(default)/documents:runQuery`;
@@ -49,10 +57,10 @@ const printMessage = (line) => {
 // ── Startup prompts ─────────────────────────────────────────────────────────────
 console.log('=== CipherChat CLI ===');
 
-const username = (await ask('Your username (must match your Google display name): ')).trim().slice(0, MAX_LEN);
+const username = (await ask('Your username (must match your Google display name): ')).trim().slice(0, MAX_USERNAME_LEN);
 if (!username) { console.error('Username required.'); process.exit(1); }
 
-const recipient = (await ask('Chat with (display name): ')).trim().slice(0, MAX_LEN);
+const recipient = (await ask('Chat with (display name): ')).trim().slice(0, MAX_USERNAME_LEN);
 if (!recipient) { console.error('Recipient required.'); process.exit(1); }
 if (recipient === username) { console.error('Cannot chat with yourself.'); process.exit(1); }
 
@@ -94,7 +102,7 @@ socket.on('message', ({ from, payload }) => {
 
 // ── Outgoing — encrypt then send ────────────────────────────────────────────────
 rl.on('line', (line) => {
-  const text = line.trim().slice(0, 1024);
+  const text = line.trim().slice(0, MAX_MESSAGE_LEN);
   if (!text) { rl.prompt(); return; }
   if (!socket.connected) { console.error('Not connected.'); rl.prompt(); return; }
 
