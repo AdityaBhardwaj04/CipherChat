@@ -11,8 +11,13 @@ service cloud.firestore {
     match /usernames/{username} {
       // Anyone can read the username→uid index — needed by CLI and browser for key lookup
       allow read: if true;
-      // Only the authenticated user can claim their own username entry
-      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      // Only the authenticated user can claim their own username.
+      // Server-side: enforce ownership and format (3-20 chars, lowercase alphanumeric + underscore).
+      allow create: if request.auth != null
+                    && request.resource.data.uid == request.auth.uid
+                    && username.size() >= 3
+                    && username.size() <= 20
+                    && username.matches('^[a-z0-9_]+$');
       // Usernames are immutable — no updates or deletes
       allow update, delete: if false;
     }

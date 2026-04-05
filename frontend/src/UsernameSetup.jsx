@@ -1,21 +1,21 @@
 import { useState } from 'react';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, runTransaction } from 'firebase/firestore';
 import { db } from './firebase';
 
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 
-// Claim a username atomically:
-//   1. Check usernames/{username} doesn't exist yet
-//   2. Write usernames/{username} = { uid }        ← uniqueness index
-//   3. Write users/{uid}.username = username
-// If step 2 fails (doc already exists), the username is taken.
+// Claim a username inside a Firestore transaction — fully atomic.
+// Both the index write and the user profile update succeed or fail together,
+// and the read-then-write is protected against concurrent claims.
 async function claimUsername(uid, username) {
   const indexRef = doc(db, 'usernames', username);
-  const snap     = await getDoc(indexRef);
-  if (snap.exists()) throw new Error('Username already taken.');
-
-  await setDoc(indexRef, { uid });
-  await updateDoc(doc(db, 'users', uid), { username });
+  const userRef  = doc(db, 'users', uid);
+  await runTransaction(db, async (tx) => {
+    const indexSnap = await tx.get(indexRef);
+    if (indexSnap.exists()) throw new Error('Username already taken.');
+    tx.set(indexRef, { uid });
+    tx.update(userRef, { username });
+  });
 }
 
 export default function UsernameSetup({ uid, onComplete }) {
