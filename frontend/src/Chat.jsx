@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import {
-  collection, query, where, getDocs, addDoc, serverTimestamp,
+  collection, doc, query, where, getDoc, getDocs, addDoc, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { encryptMessage, decryptMessage } from './encrypt';
@@ -13,13 +13,16 @@ function conversationId(nameA, nameB) {
   return [nameA, nameB].sort().join('::');
 }
 
-// Fetch a user's RSA public key from Firestore by their display name.
-async function fetchPublicKey(displayName) {
-  const q    = query(collection(db, 'users'), where('displayName', '==', displayName));
-  const snap = await getDocs(q);
-  if (snap.empty) throw new Error(`"${displayName}" not found. Have they signed in and generated keys?`);
-  const key = snap.docs[0].data().publicKey;
-  if (!key) throw new Error(`"${displayName}" has no public key yet.`);
+// Fetch a user's RSA public key from Firestore by their username.
+// Uses the usernames/{username} index to resolve uid, then reads users/{uid}.
+// Avoids displayName lookup which is not unique and can change.
+async function fetchPublicKey(username) {
+  const indexSnap = await getDoc(doc(db, 'usernames', username));
+  if (!indexSnap.exists()) throw new Error(`"${username}" not found. Have they signed in and chosen a username?`);
+  const uid      = indexSnap.data().uid;
+  const userSnap = await getDoc(doc(db, 'users', uid));
+  const key      = userSnap.data()?.publicKey;
+  if (!key) throw new Error(`"${username}" has no public key yet.`);
   return key;
 }
 
@@ -28,8 +31,8 @@ async function fetchPublicKey(displayName) {
 //   payloadForRecipient — encrypted with the recipient's public key
 //   payloadForSender    — encrypted with the sender's own public key
 // This lets both parties decrypt history using only their own private key.
-async function loadHistory(myDisplayName, recipientDisplayName, uid) {
-  const convId = conversationId(myDisplayName, recipientDisplayName);
+async function loadHistory(myUsername, recipientUsername, uid) {
+  const convId = conversationId(myUsername, recipientUsername);
   const q      = query(collection(db, 'messages'), where('conversationId', '==', convId));
   const snap   = await getDocs(q);
 
@@ -41,7 +44,7 @@ async function loadHistory(myDisplayName, recipientDisplayName, uid) {
   for (const data of docs) {
     // Sender decrypts their own copy; recipient decrypts theirs.
     // CLI messages only have payloadForRecipient (no sender copy).
-    const payload = data.from === myDisplayName && data.payloadForSender
+    const payload = data.from === myUsername && data.payloadForSender
       ? data.payloadForSender
       : data.payloadForRecipient;
     try {
@@ -54,7 +57,7 @@ async function loadHistory(myDisplayName, recipientDisplayName, uid) {
   return messages;
 }
 
-export default function Chat({ user, ownPublicKey }) {
+export default function Chat({ user, username, ownPublicKey }) {
   const [recipientInput, setRecipientInput] = useState('');
   const [started, setStarted]   = useState(false);
   const [messages, setMessages] = useState([]);
@@ -90,7 +93,7 @@ export default function Chat({ user, ownPublicKey }) {
 
     // Load encrypted history before opening the socket
     try {
-      const history = await loadHistory(user.displayName, name, user.uid);
+      const history = await loadHistory(username, name, user.uid);
       setMessages(history);
     } catch {
       // Non-fatal — proceed without history
@@ -100,7 +103,7 @@ export default function Chat({ user, ownPublicKey }) {
     socketRef.current = socket;
 
     socket.on('connect', () => {
-      socket.emit('register', user.displayName);
+      socket.emit('register', username);
       setStatus('connected');
       setStarted(true);
     });
@@ -130,9 +133,9 @@ export default function Chat({ user, ownPublicKey }) {
       // than silently swallowed (previous .catch(()=>{}) hid the real error).
       try {
         await addDoc(collection(db, 'messages'), {
-          conversationId:      conversationId(user.displayName, from),
+          conversationId:      conversationId(username, from),
           from,
-          to:                  user.displayName,
+          to:                  username,
           payloadForRecipient: payload,
           timestamp:           serverTimestamp(),
         });
@@ -158,8 +161,8 @@ export default function Chat({ user, ownPublicKey }) {
 
       // Persist to Firestore — history available even if recipient is offline
       await addDoc(collection(db, 'messages'), {
-        conversationId:    conversationId(user.displayName, recipientName.current),
-        from:              user.displayName,
+        conversationId:    conversationId(username, recipientName.current),
+        from:              username,
         to:                recipientName.current,
         payloadForRecipient,
         payloadForSender,
@@ -168,7 +171,7 @@ export default function Chat({ user, ownPublicKey }) {
 
       // Relay the recipient's payload via socket for real-time delivery
       socketRef.current.emit('message', {
-        from:    user.displayName,
+        from:    username,
         to:      recipientName.current,
         payload: payloadForRecipient,
       });
