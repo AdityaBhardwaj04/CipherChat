@@ -4,6 +4,7 @@ import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firest
 import { auth, db, provider, clearConfig } from './firebase';
 import { generateKeyPair, hasKeyPair, downloadPrivateKey, deletePrivateKey } from './crypto';
 import Chat from './Chat';
+import UsernameSetup from './UsernameSetup';
 
 // Create Firestore profile on first sign-in.
 async function ensureUserProfile(user) {
@@ -16,6 +17,7 @@ async function ensureUserProfile(user) {
       email:       user.email,
       photoURL:    user.photoURL,
       publicKey:   null,
+      username:    null,
       createdAt:   serverTimestamp(),
     };
     await setDoc(ref, data);
@@ -41,22 +43,24 @@ async function setupKeys(uid) {
 }
 
 export default function App() {
-  const [user, setUser]             = useState(undefined);
-  const [keyReady, setKeyReady]     = useState(false);
+  const [user, setUser]                 = useState(undefined);
+  const [keyReady, setKeyReady]         = useState(false);
   const [keyGenerated, setKeyGenerated] = useState(false);
   const [ownPublicKey, setOwnPublicKey] = useState(null);
-  const [error, setError]           = useState(null);
-  const [loading, setLoading]       = useState(false);
+  const [username, setUsername]         = useState(null);  // null = not yet loaded
+  const [error, setError]               = useState(null);
+  const [loading, setLoading]           = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (u) {
         try {
-          await ensureUserProfile(u);
+          const profile = await ensureUserProfile(u);
           const { generated } = await setupKeys(u.uid);
           // Fetch own public key — needed by Chat for double-encryption (message history)
           const snap = await getDoc(doc(db, 'users', u.uid));
           setOwnPublicKey(snap.data()?.publicKey ?? null);
+          setUsername(profile.username ?? snap.data()?.username ?? null);
           setKeyGenerated(generated);
           setKeyReady(true);
         } catch (e) {
@@ -66,6 +70,7 @@ export default function App() {
         setKeyReady(false);
         setKeyGenerated(false);
         setOwnPublicKey(null);
+        setUsername(null);
       }
       setUser(u ?? null);
     });
@@ -119,7 +124,9 @@ export default function App() {
       {user ? (
         <>
           <p>Signed in as <strong>{user.displayName}</strong> ({user.email})</p>
-          <p style={{ color: 'grey', fontSize: '0.85rem' }}>UID: {user.uid}</p>
+          {username && (
+            <p style={{ color: 'grey', fontSize: '0.85rem' }}>@{username}</p>
+          )}
 
           {!keyReady && <p>Generating RSA key pair…</p>}
 
@@ -145,7 +152,13 @@ export default function App() {
           </button>
           <button onClick={handleSignOut}>Sign out</button>
 
-          {keyReady && <Chat user={user} ownPublicKey={ownPublicKey} />}
+          {/* Gate Chat behind username — pick username first if not set yet */}
+          {keyReady && !username && (
+            <UsernameSetup uid={user.uid} onComplete={setUsername} />
+          )}
+          {keyReady && username && (
+            <Chat user={user} username={username} ownPublicKey={ownPublicKey} />
+          )}
         </>
       ) : (
         <>
