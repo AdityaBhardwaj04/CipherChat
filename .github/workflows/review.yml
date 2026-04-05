@@ -21,38 +21,54 @@ jobs:
         run: |
           head -n 300 diff.txt > small_diff.txt
 
-      - name: Run Review
+      - name: Get Developer Comments
         run: |
-          PROMPT=$(cat prompts/CODEX.txt)
-          DIFF=$(cat small_diff.txt)
+          git log -1 --pretty=%B > claude_comments.txt
 
-          FULL_INPUT="$PROMPT\n\nCODE:\n$DIFF"
+      - name: Build Full Input
+        run: |
+          {
+            cat prompts/CODEX.txt
+            printf '\n\n## CODE DIFF\n\n'
+            cat small_diff.txt
+            printf '\n\n## DEVELOPER COMMENTS\n\n'
+            cat claude_comments.txt
+          } > full_input.txt
 
-          JSON=$(jq -n --arg input "$FULL_INPUT" '{
-            "model": "gpt-4.1-mini",
+      - name: Create JSON Payload
+        run: |
+          JSON=$(jq -n --arg input "$(cat full_input.txt)" '{
+            model: "gpt-4.1-mini",
             input: $input
           }')
 
-          echo "===== REQUEST JSON ====="
-          echo "$JSON"
+          echo "$JSON" > request.json
 
+          echo "===== REQUEST JSON ====="
+          cat request.json
+
+      - name: Call OpenAI API
+        run: |
           curl https://api.openai.com/v1/responses \
             -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -d "$JSON" > review.json
+            -d @request.json > review.json
 
           echo "===== RAW RESPONSE ====="
-          cat review.json    
+          cat review.json
 
+      - name: Extract Review
+        run: |
+          REVIEW=$(jq -r '.output[0].content[0].text // "No review generated"' review.json)
+
+          echo "$REVIEW" > final_review.txt
+
+          echo "==== Final Review ===="
+          cat final_review.txt
 
       - name: Comment PR
         run: |
-          REVIEW=$(jq -r '.output[0].content[0].text' review.json)
-
-          echo "====Final Review===="
-          echo "$REVIEW"
-
           gh pr comment ${{ github.event.pull_request.number }} \
-            --body "$REVIEW"
+            --body "$(cat final_review.txt)"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
