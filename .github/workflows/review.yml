@@ -1,0 +1,43 @@
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get diff
+        run: |
+          git fetch origin main
+          git diff origin/main > diff.txt
+
+      - name: Trim diff
+        run: |
+          head -n 300 diff.txt > small_diff.txt
+
+      - name: Run Review
+        run: |
+          PROMPT=$(cat prompts/CODEX.txt)
+          DIFF=$(cat small_diff.txt)
+
+          curl https://api.openai.com/v1/responses \
+            -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"model\": \"gpt-5.3\",
+              \"input\": \"$PROMPT\n\nCODE:\n$DIFF\"
+            }" > review.json
+
+      - name: Comment PR
+        run: |
+          REVIEW=$(jq -r '.output[0].content[0].text' review.json)
+
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body "$REVIEW"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
