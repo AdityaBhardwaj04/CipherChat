@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(gh repo:*)"
+      "Bash(gh repo:*)",
+      "Bash(npm install:*)",
+      "Bash(pkill -f \"node src/index.js\")",
+      "Bash(taskkill /F /IM node.exe)"
     ]
   }
 }
