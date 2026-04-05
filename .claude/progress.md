@@ -13,8 +13,8 @@ Main branch: `main`
 3. CLI basic connection ✅
 4. Web authentication ✅
 5. RSA key generation module ✅
-6. Encryption utilities (AES + RSA) ⬅ NEXT
-7. Message flow
+6. Encryption utilities (AES + RSA) ✅
+7. Message flow ⬅ NEXT
 8. Improvements
 
 ---
@@ -64,25 +64,24 @@ Main branch: `main`
 
 ---
 
-## Step 6 — What to Build Next
-**Encryption utilities (AES + RSA)**
-
-### Plan
-- `frontend/src/encrypt.js` and `cli/src/encrypt.js` (shared logic, same Web Crypto / node:crypto API)
+### Step 6 — Encryption Utilities (AES + RSA)
+**Files:** `frontend/src/encrypt.js`, `cli/src/encrypt.js`
 - `encryptMessage(plaintext, recipientPublicKeyPem)`:
-  1. Generate random AES-256-GCM key
-  2. Encrypt plaintext with AES-256-GCM → `{ iv, ciphertext, authTag }`
-  3. Encrypt AES key with recipient's RSA-OAEP public key → `encryptedKey`
-  4. Return `{ iv, encryptedKey, ciphertext }` — this is the `payload` shape the backend relays
-- `decryptMessage(payload, privateKey)`:
-  1. Decrypt `encryptedKey` with own RSA private key → AES key
-  2. Decrypt `ciphertext` with AES-256-GCM using `iv` → plaintext
-- CLI needs to load private key from `.pem` file → import via `node:crypto`
+  1. Random AES-256-GCM key + 12-byte IV
+  2. Encrypt plaintext → ciphertext (auth tag appended, last 16 bytes)
+  3. Wrap AES key with recipient's RSA-OAEP public key
+  4. Return `{ iv, encryptedKey, ciphertext }` (all base64)
+- `decryptMessage(payload, key)`:
+  1. Unwrap AES key with own RSA private key
+  2. Split auth tag (last 16 bytes) from ciphertext
+  3. Decrypt with AES-256-GCM + verify auth tag → plaintext
+- `loadPrivateKey(pemPath)` (CLI only): reads PKCS#8 PEM from disk
+- **Compatibility**: Web Crypto appends auth tag automatically; Node.js appends/splits manually — both produce identical payload shape
 
-### Key constraint
-- Frontend uses `window.crypto.subtle`
-- CLI uses `node:crypto` (same Web Crypto API in Node 18+)
-- Both must produce compatible ciphertext
+---
+
+## Step 7 — What to Build Next
+**Message flow** — wire encrypt.js into CLI send/receive and frontend send/receive
 
 ---
 
