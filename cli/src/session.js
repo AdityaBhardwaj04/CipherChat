@@ -6,7 +6,7 @@
  * Passwords are never saved — entered once per session and used only for auth.
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync, chmodSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join }    from 'node:path';
 
@@ -21,6 +21,8 @@ export function loadSession() {
 export function saveSession(session) {
   if (!existsSync(SESSION_DIR)) mkdirSync(SESSION_DIR, { recursive: true });
   writeFileSync(SESSION_FILE, JSON.stringify(session, null, 2), 'utf8');
+  // Restrict to owner read/write only (Unix: 600) — session contains email and Firebase config
+  try { chmodSync(SESSION_FILE, 0o600); } catch { /* no-op on Windows */ }
 }
 
 export function clearSession() {

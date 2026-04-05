@@ -16,17 +16,46 @@ const rl  = readline.createInterface({ input: process.stdin, output: process.std
 const ask = (prompt) => new Promise((resolve) => rl.question(prompt, resolve));
 
 // Ask for a password without echoing it to the terminal.
+// Reads raw keystrokes so the password is never visible on screen.
 async function askPassword(prompt) {
-  process.stdout.write(prompt);
-  process.stdin.setRawMode(true);
   return new Promise((resolve) => {
-    let pwd = '';
-    process.stdin.once('data', function handler(chunk) {
-      // Handle char-by-char input in raw mode
-    });
-    // Fall back to readline (shows input) — raw mode handling kept simple
-    process.stdin.setRawMode(false);
-    rl.question('', resolve);
+    const { stdin, stdout } = process;
+    stdout.write(prompt);
+    stdin.setRawMode(true);
+    stdin.resume();
+    stdin.setEncoding('utf8');
+
+    let password = '';
+
+    function onData(char) {
+      switch (char) {
+        case '\n':
+        case '\r':
+        case '\u0004': // Ctrl-D
+          stdout.write('\n');
+          stdin.setRawMode(false);
+          stdin.pause();
+          stdin.removeListener('data', onData);
+          resolve(password);
+          break;
+        case '\u0003': // Ctrl-C
+          process.exit();
+          break;
+        case '\u007F': // Backspace
+          if (password.length > 0) {
+            password = password.slice(0, -1);
+            stdout.clearLine(0);
+            stdout.cursorTo(0);
+            stdout.write(prompt + '*'.repeat(password.length));
+          }
+          break;
+        default:
+          password += char;
+          stdout.write('*');
+      }
+    }
+
+    stdin.on('data', onData);
   });
 }
 
@@ -69,8 +98,8 @@ if (!session) {
   console.log(`Logged in as @${session.username}  (--reset to switch accounts)\n`);
 }
 
-// Always ask for password — never persisted
-const password = (await ask('Password: ')).trim();
+// Always ask for password — never persisted, input hidden
+const password = (await askPassword('Password: ')).trim();
 if (!password) { console.error('Password required.'); process.exit(1); }
 
 // Load private key from disk
