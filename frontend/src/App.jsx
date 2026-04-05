@@ -9,16 +9,18 @@ async function ensureUserProfile(user) {
   const ref  = doc(db, 'users', user.uid);
   const snap = await getDoc(ref);
   if (!snap.exists()) {
-    await setDoc(ref, {
+    const data = {
       uid:         user.uid,
       displayName: user.displayName,
       email:       user.email,
       photoURL:    user.photoURL,
       publicKey:   null,
       createdAt:   serverTimestamp(),
-    });
+    };
+    await setDoc(ref, data);
+    return data;
   }
-  return snap.data() ?? null;
+  return snap.data();
 }
 
 // Generate keys if none exist, then persist public key to Firestore.

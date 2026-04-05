@@ -54,7 +54,13 @@ async function loadPrivateKey(uid) {
 // ── Encoding helpers ───────────────────────────────────────────────────────────
 
 function bufferToPem(buffer, label) {
-  const b64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+  // Chunked encoding avoids spread-operator argument limit for large keys.
+  const bytes = new Uint8Array(buffer);
+  let b64 = '';
+  const CHUNK = 4096;
+  for (let i = 0; i < bytes.byteLength; i += CHUNK) {
+    b64 += btoa(String.fromCharCode(...bytes.subarray(i, i + CHUNK)));
+  }
   const lines = b64.match(/.{1,64}/g).join('\n');
   return `-----BEGIN ${label}-----\n${lines}\n-----END ${label}-----\n`;
 }
