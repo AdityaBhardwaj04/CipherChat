@@ -47,7 +47,10 @@ jobs:
 
       - name: Comment PR
         run: |
-          REVIEW=$(jq -r '.output_text' review.json)
+          REVIEW=$(jq -r '.output[0].content[0].text' review.json)
+
+          echo "====Final Review===="
+          echo "$REVIEW"
 
           gh pr comment ${{ github.event.pull_request.number }} \
             --body "$REVIEW"
