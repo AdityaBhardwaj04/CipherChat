@@ -3,6 +3,7 @@ import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, provider } from './firebase';
 import { generateKeyPair, hasKeyPair, downloadPrivateKey, deletePrivateKey } from './crypto';
+import Chat from './Chat';
 
 // Create Firestore profile on first sign-in.
 async function ensureUserProfile(user) {
@@ -138,6 +139,8 @@ export default function App() {
             Re-download private key
           </button>
           <button onClick={handleSignOut}>Sign out</button>
+
+          {keyReady && <Chat user={user} />}
         </>
       ) : (
         <>
