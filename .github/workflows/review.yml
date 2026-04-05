@@ -9,7 +9,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
       - name: Get diff
         run: |
@@ -35,7 +36,7 @@ jobs:
 
       - name: Comment PR
         run: |
-          REVIEW=$(jq -r '.output[0].content[0].text' review.json)
+          REVIEW=$(jq -r '.output_text' review.json)
 
           gh pr comment ${{ github.event.pull_request.number }} \
             --body "$REVIEW"
