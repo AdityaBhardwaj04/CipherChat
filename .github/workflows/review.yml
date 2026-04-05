@@ -33,6 +33,9 @@ jobs:
               \"model\": \"gpt-5.3\",
               \"input\": \"$PROMPT\n\nCODE:\n$DIFF\"
             }" > review.json
+          
+          echo "---Raw Response----"
+          cat review.json
 
       - name: Comment PR
         run: |
