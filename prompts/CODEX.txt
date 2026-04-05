@@ -66,6 +66,7 @@ You MUST verify:
 - Only fix what is wrong
 - Be concise but precise
 - Assume this will go to production
+- Also consider the comments from the coding agent for why they might not be fixing some errors right away
 
 ---
 

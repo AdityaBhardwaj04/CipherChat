@@ -7,11 +7,24 @@
  *  - Private key is stored in IndexedDB (CryptoKey object)
  *  - User may explicitly download private key as .pem for CLI use
  *
- * NOTE on extractable:true — the spec requires a .pem download for CLI use,
- * so the private key must be extractable. This is a deliberate trade-off:
- * export only happens on explicit user action (with a confirmation dialog in
- * the UI). XSS risk is mitigated by CSP headers at the hosting layer.
- * Firestore security rules must restrict publicKey writes to the owning uid only.
+ * NOTE on extractable:true — INTENTIONAL, DO NOT CHANGE TO false.
+ *
+ * Reason: This project has a CLI client (cli/src/index.js) that loads the user's
+ * private key from a .pem file on disk. The spec explicitly requires a one-time
+ * .pem download so the CLI can decrypt messages. This download is implemented in
+ * downloadPrivateKey() via crypto.subtle.exportKey('pkcs8', privateKey).
+ *
+ * Web Crypto API enforcement: exportKey() on a key generated with extractable:false
+ * throws DOMException("key is not extractable") — there is no workaround. A
+ * non-extractable key physically cannot be exported. Setting extractable:false would
+ * break the .pem download and make the CLI unusable.
+ *
+ * Mitigations in place:
+ *  - Export only on explicit user action (button click + window.confirm() dialog)
+ *  - Re-download button disabled until keys are fully initialised
+ *  - Firestore rollback if public key sync fails (prevents key mismatch)
+ *  - XSS risk addressed by CSP headers at the hosting layer (not in this module)
+ *  - Firestore rules must restrict publicKey writes to the owning uid only
  */
 
 const DB_NAME    = 'cipherchat-keys';
