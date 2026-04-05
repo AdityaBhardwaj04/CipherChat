@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node C:/Users/abdad/Desktop/terminal-chat/scripts/fetch-review.js",
+            "timeout": 10,
+            "statusMessage": "Checking for PR review comments..."
+          }
+        ]
+      }
+    ]
+  }
+}
